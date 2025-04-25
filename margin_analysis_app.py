@@ -44,8 +44,7 @@ def plot_price_cost_margin_figure(
     ax2.set_ylim(0, None)
 
     coeffs = np.polyfit(x, df_item["gross_unit_margin_pct"], 1)
-    ax2.plot(x, np.poly1d(coeffs)(x), linestyle="--",
-             label="Linear Trend", color=line_color_trend)
+    ax2.plot(x, np.poly1d(coeffs)(x), linestyle="--", label="Linear Trend", color=line_color_trend)
     ax2.legend(loc="lower right")
 
     plt.tight_layout()
@@ -133,15 +132,10 @@ def main():
 
         # Filter data for TTM
         grouped_items = grouped_items.loc[grouped_items.index.get_level_values('Month') >= ttm_start_month]
-        date_filter_description = f"Trailing Twelve Months ({ttm_start_month} to {latest_month})"
     elif selected_years:
         # Filter data for selected years
         grouped_items = grouped_items.loc[
             grouped_items.index.get_level_values('Month').map(lambda x: x.year in selected_years)]
-        date_filter_description = f"Selected Years: {', '.join(map(str, selected_years))}"
-    else:
-        # If no years selected and not using TTM, use all data
-        date_filter_description = "All Available Data"
 
     # Configure grid options
     gb = GridOptionsBuilder.from_dataframe(df)
@@ -164,20 +158,28 @@ def main():
     selected_item = None
 
     selected_rows = grid_response.get('selected_rows', [])
-    if len(selected_rows) > 0:
+    if selected_rows is not None and len(selected_rows) > 0:
         if isinstance(selected_rows, pd.DataFrame):
             selected_item = selected_rows.iloc[0]['Item']
         else:
             selected_item = selected_rows[0]['Item']
-    st.session_state.selected_item = selected_item
 
-    try:
-        fig = plot_price_cost_margin_figure(grouped_items, selected_item)
-        st.pyplot(fig)
-        series = grouped_items.xs(selected_item, level="Item").sort_index()
-        st.dataframe(series)
-    except ItemNotFoundError as e:
-        st.error(str(e))
+        st.session_state.selected_item = selected_item
+
+        try:
+            fig = plot_price_cost_margin_figure(grouped_items, selected_item)
+            st.pyplot(fig)
+
+            if selected_item:
+                st.header("Item-Level Data")
+                series = grouped_items.xs(selected_item, level="Item").sort_index()
+                cols = ['Description', 'total_quantity', 'total_sales', 'num_invoice_lines', 'avg_unit_price',
+                        'avg_unit_cost', 'gross_unit_margin', 'gross_unit_margin_pct']
+                series = series[cols]
+                st.dataframe(series, height=len(series) * 36)
+
+        except ItemNotFoundError as e:
+            st.error(str(e))
 
 if __name__ == "__main__":
     main()
